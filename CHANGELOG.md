@@ -1,3 +1,3 @@
-## 0.0.1
+## [0.0.1] - 2023-05-29
 
-* TODO: Describe initial release.
+* Pay order with tokenized card
