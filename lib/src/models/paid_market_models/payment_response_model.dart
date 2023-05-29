@@ -4,8 +4,8 @@
 
 import 'dart:convert';
 
-import 'package:mercadopago_checkouts/src/models/paid_market_models/cards.dart';
-import 'package:mercadopago_checkouts/src/models/paid_market_models/identification.dart';
+import 'package:mercadopago_by_binnicordova/src/models/paid_market_models/cards.dart';
+import 'package:mercadopago_by_binnicordova/src/models/paid_market_models/identification.dart';
 
 PaymentResponseModel paymentResponseModelFromJson(String? str) =>
     PaymentResponseModel.fromJson(json.decode(str!));

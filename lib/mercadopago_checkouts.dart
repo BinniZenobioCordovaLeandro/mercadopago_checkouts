@@ -8,12 +8,12 @@ library mercadopago_checkouts;
 
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:mercadopago_checkouts/src/models/card_type_model.dart';
-import 'package:mercadopago_checkouts/src/models/paid_market_models/cards.dart';
-import 'package:mercadopago_checkouts/src/models/paid_market_models/customer_model.dart';
-import 'package:mercadopago_checkouts/src/models/paid_market_models/payment_response_model.dart';
-import 'package:mercadopago_checkouts/src/models/payer_cost_model.dart';
-import 'package:mercadopago_checkouts/src/models/user_model.dart';
+import 'package:mercadopago_by_binnicordova/src/models/card_type_model.dart';
+import 'package:mercadopago_by_binnicordova/src/models/paid_market_models/cards.dart';
+import 'package:mercadopago_by_binnicordova/src/models/paid_market_models/customer_model.dart';
+import 'package:mercadopago_by_binnicordova/src/models/paid_market_models/payment_response_model.dart';
+import 'package:mercadopago_by_binnicordova/src/models/payer_cost_model.dart';
+import 'package:mercadopago_by_binnicordova/src/models/user_model.dart';
 
 class PaidMarketProvider {
   final String domain = 'api.mercadopago.com';

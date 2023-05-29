@@ -1,8 +1,8 @@
 ### I'm Binni Cordova, a Great Programmer
 
-# MERCADOPAGO checkouts
+# MERCADOPAGO by BinniCordova
 
-I'm currenlu using this package on my ecommerces for proccess payments with cards.
+I'm currently using this package on my e-commerce and marketplace apps to process payments with cards.
 
 ## Contributions
 
