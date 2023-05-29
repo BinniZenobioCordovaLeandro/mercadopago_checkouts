@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:mercadopago_checkouts/src/models/issuer_model.dart';
+import 'package:mercadopago_by_binnicordova/src/models/issuer_model.dart';
 
 @immutable
 class CardTypeModel {

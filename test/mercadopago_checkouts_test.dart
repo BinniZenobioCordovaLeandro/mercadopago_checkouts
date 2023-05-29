@@ -1,13 +1,13 @@
 import 'package:faker/faker.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mercadopago_checkouts/mercadopago_checkouts.dart';
-import 'package:mercadopago_checkouts/src/enums/paid_market_status_type_enum.dart';
-import 'package:mercadopago_checkouts/src/models/paid_market_models/cardholder.dart';
-import 'package:mercadopago_checkouts/src/models/paid_market_models/cards.dart';
-import 'package:mercadopago_checkouts/src/models/paid_market_models/customer_model.dart';
-import 'package:mercadopago_checkouts/src/models/paid_market_models/identification.dart';
-import 'package:mercadopago_checkouts/src/models/paid_market_models/payment_response_model.dart';
-import 'package:mercadopago_checkouts/src/models/user_model.dart';
+import 'package:mercadopago_by_binnicordova/mercadopago_checkouts.dart';
+import 'package:mercadopago_by_binnicordova/src/enums/paid_market_status_type_enum.dart';
+import 'package:mercadopago_by_binnicordova/src/models/paid_market_models/cardholder.dart';
+import 'package:mercadopago_by_binnicordova/src/models/paid_market_models/cards.dart';
+import 'package:mercadopago_by_binnicordova/src/models/paid_market_models/customer_model.dart';
+import 'package:mercadopago_by_binnicordova/src/models/paid_market_models/identification.dart';
+import 'package:mercadopago_by_binnicordova/src/models/paid_market_models/payment_response_model.dart';
+import 'package:mercadopago_by_binnicordova/src/models/user_model.dart';
 
 String auth =
     'Bearer TEST-5314773940691692-052819-9810f4e245f146cf5c056b051fa41519-445803597';

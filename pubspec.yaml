@@ -1,7 +1,7 @@
-name: mercadopago_checkouts
-description: A new Flutter package project.
+name: mercadopago_by_binnicordova
+description: A complete package to pay orders using mercadopago platform, wrote by BinniCordova.
 version: 0.0.1
-homepage: null
+homepage: https://binnicordova.com/
 
 environment:
   sdk: '>=3.0.2 <4.0.0'
