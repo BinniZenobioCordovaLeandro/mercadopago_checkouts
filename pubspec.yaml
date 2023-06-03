@@ -1,6 +1,6 @@
 name: mercadopago_by_binnicordova
 description: A complete package to pay orders using mercadopago platform, wrote by BinniCordova.
-version: 0.0.1
+version: 0.0.2
 homepage: https://binnicordova.com/
 
 environment:

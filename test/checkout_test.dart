@@ -1,4 +1,5 @@
 import 'package:faker/faker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mercadopago_by_binnicordova/mercadopago_checkouts.dart';
 import 'package:mercadopago_by_binnicordova/src/enums/paid_market_status_type_enum.dart';
@@ -14,7 +15,7 @@ String auth =
 
 void main() {
   test('search not register customer', () async {
-    PaidMarketProvider paidMarketProvider = PaidMarketProvider(
+    CheckoutProvider paidMarketProvider = CheckoutProvider(
       authorization: auth,
     );
 
@@ -36,7 +37,7 @@ void main() {
   });
 
   test('search register customer', () async {
-    PaidMarketProvider paidMarketProvider = PaidMarketProvider(
+    CheckoutProvider paidMarketProvider = CheckoutProvider(
       authorization: auth,
     );
 
@@ -58,7 +59,7 @@ void main() {
   });
 
   test('create customer', () async {
-    PaidMarketProvider paidMarketProvider = PaidMarketProvider(
+    CheckoutProvider paidMarketProvider = CheckoutProvider(
       authorization: auth,
     );
 
@@ -83,7 +84,7 @@ void main() {
   });
 
   test('create customer card', () async {
-    PaidMarketProvider paidMarketProvider = PaidMarketProvider(
+    CheckoutProvider paidMarketProvider = CheckoutProvider(
       authorization: auth,
     );
 
@@ -135,8 +136,31 @@ void main() {
     );
   });
 
-  test('pay order', () async {
-    PaidMarketProvider paidMarketProvider = PaidMarketProvider(
+  test('list customer cards', () async {
+    CheckoutProvider paidMarketProvider = CheckoutProvider(
+      authorization: auth,
+    );
+
+    UserModel user = const UserModel(
+      firstName: 'Raul',
+      lastName: 'Romero Diaz',
+      document: '34127856',
+      email: 'bin@gmail.com',
+      idCountriesCodes: 'PE',
+      phoneCode: "+51",
+      phoneNumber: '987654321',
+      idCountriesDocumentsTypes: 'DNI',
+    );
+
+    // SEARCH CUSTOMER
+    CustomerModel? customerModel =
+        await paidMarketProvider.customerSearch(userModel: user);
+
+    expect(customerModel?.cards, isList);
+  });
+
+  test('pay order with new card', () async {
+    CheckoutProvider paidMarketProvider = CheckoutProvider(
       authorization: auth,
     );
 
@@ -177,17 +201,16 @@ void main() {
       expirationMonth: 11,
       cvv: '123',
     );
-    Map? response = await paidMarketProvider.customerCardTokenCreate(
-      dataCard: card,
-      email: user.email,
-    );
-    Card tokenizedCard = response!['data'] as Card;
-    expect(tokenizedCard.id, isNot(equals(null)));
+
+    Card? tokenizedCard =
+        await CardProvider(authorization: auth).tokenCardCreate(card);
+
+    expect(tokenizedCard?.id, isNot(equals(null)));
 
     // PAY ORDER
     final PaymentResponseModel? paymentResponseModel =
         await paidMarketProvider.payOrder(
-      dataCard: tokenizedCard,
+      dataCard: tokenizedCard!,
       userModel: user,
       orderNumber: orderUID,
       amount: orderAmount,
@@ -206,23 +229,72 @@ void main() {
         equals(PaidMarketStatusTypeEnum.PendingContingency.value),
       );
     } else {
-      expect(
-        paymentResponseModel?.statusDetail,
-        isNot(equals(PaidMarketStatusTypeEnum.Accredited.value)),
-      );
-      expect(
-        paymentResponseModel?.statusDetail,
-        isNot(equals(PaidMarketStatusTypeEnum.PendingContingency.value)),
-      );
-      expect(
-        paymentResponseModel?.statusDetail,
-        isNot(equals(PaidMarketStatusTypeEnum.PendingReviewManual.value)),
-      );
+      throw ErrorDescription('${paymentResponseModel?.statusDetail}');
     }
 
     // DELETE CARD (only if necesary)
     if (tokenizedCard.save == false) {
       paidMarketProvider.customerCardDelete(dataCard: tokenizedCard);
+    }
+  });
+
+  test('pay order with saved card', () async {
+    CheckoutProvider paidMarketProvider = CheckoutProvider(
+      authorization: auth,
+    );
+
+    UserModel user = const UserModel(
+      firstName: 'Raul',
+      lastName: 'Romero Diaz',
+      document: '34127856',
+      email: 'bin@gmail.com',
+      idCountriesCodes: 'PE',
+      phoneCode: "+51",
+      phoneNumber: '987654321',
+      idCountriesDocumentsTypes: 'DNI',
+    );
+    String orderUID = 'order-321';
+    double orderAmount = 100.00;
+
+    // SEARCH CUSTOMER
+    CustomerModel? customerModel =
+        await paidMarketProvider.customerSearch(userModel: user);
+
+    expect(customerModel?.cards?[0], isA<Card>());
+
+    // CARD
+    Card card = customerModel?.cards?[0];
+
+    Card? tokenizedCard =
+        await CardProvider(authorization: auth).tokenCardCreate(
+      card.copyWith(cvv: '123'),
+    );
+
+    expect(tokenizedCard?.id, isNot(equals(null)));
+
+    // PAY ORDER
+    final PaymentResponseModel? paymentResponseModel =
+        await paidMarketProvider.payOrder(
+      dataCard: tokenizedCard!,
+      userModel: user,
+      orderNumber: orderUID,
+      amount: orderAmount,
+    );
+
+    if (paymentResponseModel?.statusDetail ==
+        PaidMarketStatusTypeEnum.Accredited.value) {
+      expect(paymentResponseModel?.statusDetail,
+          equals(PaidMarketStatusTypeEnum.Accredited.value));
+    } else if (paymentResponseModel?.statusDetail ==
+            PaidMarketStatusTypeEnum.PendingContingency.value ||
+        paymentResponseModel?.statusDetail ==
+            PaidMarketStatusTypeEnum.PendingReviewManual.value) {
+      expect(
+        paymentResponseModel?.statusDetail,
+        equals(PaidMarketStatusTypeEnum.PendingContingency.value),
+      );
+    } else {
+      throw ErrorDescription('${paymentResponseModel?.statusDetail}');
     }
   });
 }

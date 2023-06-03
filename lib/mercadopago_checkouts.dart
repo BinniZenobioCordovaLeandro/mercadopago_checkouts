@@ -7,6 +7,7 @@ library mercadopago_checkouts;
 // }
 
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:mercadopago_by_binnicordova/src/models/card_type_model.dart';
 import 'package:mercadopago_by_binnicordova/src/models/paid_market_models/cards.dart';
@@ -14,13 +15,157 @@ import 'package:mercadopago_by_binnicordova/src/models/paid_market_models/custom
 import 'package:mercadopago_by_binnicordova/src/models/paid_market_models/payment_response_model.dart';
 import 'package:mercadopago_by_binnicordova/src/models/payer_cost_model.dart';
 import 'package:mercadopago_by_binnicordova/src/models/user_model.dart';
+import 'package:mercadopago_by_binnicordova/src/services/http.service.dart';
 
-class PaidMarketProvider {
-  final String domain = 'api.mercadopago.com';
-  final String env = '';
-  final String version = '/v1';
-
+class CardProvider {
   final String authorization;
+
+  late HttpService httpService;
+
+  CardProvider({
+    required this.authorization,
+  }) {
+    httpService = HttpService(authorization: authorization);
+  }
+
+  Future<CustomerModel?> updatedDefaultCard({
+    required String idUser,
+    required String idCard,
+  }) {
+    final String path = "/customers/$idUser";
+
+    Map<String, dynamic> body = {
+      'default_card': idCard,
+    };
+    Future<CustomerModel?> futureCustomerModel = httpService
+        .putWithCredentials(path: path, body: body)
+        .then((http.Response response) {
+      if (response.statusCode == 200) {
+        final decodeData = json.decode(response.body);
+        dynamic data = decodeData;
+        if (data['cards'].length > 1) {
+          String defaultCard = data['default_card'];
+          for (var x = 0; x < data['cards'].length; x++) {
+            if (defaultCard == data['cards'][x]['id']) {
+              dynamic first = (data['cards'] as List).removeAt(x);
+              (data['cards'] as List).add(first);
+            }
+          }
+        }
+        CustomerModel customerModel = CustomerModel.fromJson(data);
+        return customerModel;
+      }
+      return null;
+    });
+    return futureCustomerModel;
+  }
+
+  Future<CardTypeModel?> getInstallmentsCard({required String bins}) {
+    final Map<String, String> queryStringParams = {
+      'marketplace': 'NONE',
+      'status': 'active',
+      'js_version': '1.3.1',
+      'bins': bins,
+      'referer': 'https://website.com'
+    };
+    const String path = "/payment_methods/search";
+    final Future<CardTypeModel?> futureCardTypeModel = httpService
+        .getWithCredentials(path: path, queryStringParams: queryStringParams)
+        .then((http.Response? response) {
+      if (response?.statusCode == 200) {
+        final decodeData = json.decode(response!.body);
+        if (decodeData['results'] is List) {
+          CardTypeModel cardTypeModel =
+              CardTypeModel.fromJson(decodeData['results'][0]);
+          return cardTypeModel;
+        }
+        return null;
+      }
+      return null;
+    });
+    return futureCardTypeModel;
+  }
+
+  Future<List<PayerCostModel?>?> getPayerCostCard({
+    required String paymentMethodid,
+    required int issuerId,
+    required double amount,
+  }) {
+    final Map<String, String> queryStringParams = {
+      'js_version': '1.3.1',
+      'payment_method_id': paymentMethodid,
+      'issuer.id': '$issuerId',
+      'amount': '$amount',
+      'locale': 'es',
+      'referer': 'https://website.com'
+    };
+    const String path = "/payment_methods/installments";
+    final Future<List<PayerCostModel?>?> futurePayerCostModel = httpService
+        .getWithCredentials(path: path, queryStringParams: queryStringParams)
+        .then((http.Response? response) {
+      try {
+        if (response?.statusCode == 200 && amount > 1) {
+          final decodeData = json.decode(response!.body);
+          List<PayerCostModel> listPayerCostModel =
+              List<PayerCostModel>.empty(growable: true);
+          if (decodeData?[0]?['payer_costs'] != null) {
+            for (var i = 0; i < decodeData[0]['payer_costs'].length; i++) {
+              listPayerCostModel.add(
+                  PayerCostModel.fromJson(decodeData[0]['payer_costs'][i]));
+            }
+          }
+          return listPayerCostModel;
+        }
+      } catch (e) {
+        debugPrint('getPayerCostCard error ${e.toString()}');
+      }
+      return null;
+    });
+    return futurePayerCostModel;
+  }
+
+  Future<Card?> tokenCardCreate(Card? card) {
+    const String path = "/card_tokens";
+    Map<String, dynamic> body = {};
+    if (card?.id != null) {
+      body = {"cardId": card?.id, "securityCode": card?.cvv};
+    } else {
+      body = {
+        "cardNumber": card?.cardNumber,
+        // "email": email,
+        "cardholder": card?.cardholder?.toJson(),
+        // "cardholder": {"name": "APRO"},
+        // "issuer": {"name": "APRO"},
+        "expirationYear": card?.expirationYear,
+        "expirationMonth": card?.expirationMonth,
+        "securityCode": card?.cvv
+      };
+    }
+
+    Future<Card?> futureCards = httpService
+        .postWithCredentials(path: path, body: body)
+        .then((http.Response response) {
+      final decodeData = json.decode(response.body);
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        if (decodeData != null && decodeData['id'] != null) {
+          final Card newCard = Card.fromJson(decodeData).copyWith(
+            customerId: card?.customerId,
+          );
+          return newCard;
+        }
+        return null;
+      }
+      return null;
+    });
+
+    return futureCards;
+  }
+}
+
+class CheckoutProvider {
+  final String authorization;
+
+  late HttpService httpService;
 
   Map codes = {
     'accredited':
@@ -100,110 +245,10 @@ class PaidMarketProvider {
     //TODO: flutter2.x Pedro: agregar erorr de usuario de prueba usando tarjeta
   };
 
-  PaidMarketProvider({
+  CheckoutProvider({
     required this.authorization,
-  });
-
-  Future<http.Response?> getWithCredentials({
-    required String? path,
-    Map<String, String>? queryStringParams,
-  }) async {
-    try {
-      Uri url = Uri.https(
-        domain,
-        '${this.env}${this.version}$path',
-        queryStringParams,
-      );
-
-      Future<http.Response> futureHttpResponse =
-          http.get(url, headers: <String, String>{
-        "Authorization": this.authorization,
-      }).then((dynamic response) {
-        return response;
-      }, onError: (e) {});
-      return futureHttpResponse;
-    } catch (e) {
-      return null;
-    }
-  }
-
-  Future<http.Response> postWithoutCredentials({
-    required String? path,
-    Map<String, String>? queryStringParams,
-    dynamic body,
   }) {
-    final Uri uri = Uri.https(domain, '$env/$path', queryStringParams);
-    Future<http.Response> futureHttpResponse = http
-        .post(uri,
-            headers: {
-              "Authorization":
-                  "Basic YXBwc0BwbGF0YW5pdG9zLmNvbTpNVjJdRUdXfm0qMi1bK2pqQntsRw==",
-              "Content-Type": "application/json"
-            },
-            body: jsonEncode(body))
-        .then((dynamic response) {
-      return response;
-    }, onError: (e) {});
-    return futureHttpResponse;
-  }
-
-  Future<http.Response> postWithCredentials({
-    required String? path,
-    Map<String, String>? queryStringParams,
-    dynamic body,
-  }) {
-    final Uri uri =
-        Uri.https(domain, '${this.env}${this.version}$path', queryStringParams);
-    Future<http.Response> futureHttpResponse = http
-        .post(uri,
-            headers: {
-              "Authorization": this.authorization,
-              "Content-Type": "application/json"
-            },
-            body: jsonEncode(body))
-        .then((dynamic response) {
-      return response;
-    }, onError: (e) {});
-    return futureHttpResponse;
-  }
-
-  Future<http.Response> putWithCredentials({
-    required String? path,
-    Map<String, String>? queryStringParams,
-    dynamic body,
-  }) {
-    final Uri uri =
-        Uri.https(domain, '${this.env}${this.version}$path', queryStringParams);
-    Future<http.Response> futureHttpResponse = http
-        .put(uri,
-            headers: {
-              "Authorization": this.authorization,
-              "Content-Type": "application/json"
-            },
-            body: jsonEncode(body))
-        .then((dynamic response) {
-      return response;
-    }, onError: (e) {});
-    return futureHttpResponse;
-  }
-
-  Future<http.Response> deleteWithCredentials({
-    required String? path,
-    Map<String, String>? queryStringParams,
-    dynamic body,
-  }) {
-    final Uri uri =
-        Uri.https(domain, '${this.env}${this.version}$path', queryStringParams);
-    Future<http.Response> futureHttpResponse = http.delete(
-      uri,
-      headers: {
-        "Authorization": this.authorization,
-        "Content-Type": "application/json"
-      },
-    ).then((dynamic response) {
-      return response;
-    }, onError: (e) {});
-    return futureHttpResponse;
+    httpService = HttpService(authorization: authorization);
   }
 
   payments() {
@@ -221,7 +266,7 @@ class PaidMarketProvider {
     final Map<String, String> queryStringParams = {
       'email': '${userModel?.email}',
     };
-    Future<CustomerModel?> futureCustomerModel = this
+    Future<CustomerModel?> futureCustomerModel = httpService
         .getWithCredentials(path: path, queryStringParams: queryStringParams)
         .then((http.Response? response) {
       if (response?.statusCode == 200) {
@@ -240,9 +285,7 @@ class PaidMarketProvider {
               }
             }
           }
-          CustomerModel customerModel = new CustomerModel.fromJson(
-            data,
-          );
+          CustomerModel customerModel = CustomerModel.fromJson(data);
           return customerModel;
         }
         return null;
@@ -255,7 +298,7 @@ class PaidMarketProvider {
   Future<CustomerModel?> customerCreate({
     required UserModel? userModel,
   }) {
-    final String path = "/customers";
+    const String path = "/customers";
     final Map<String, dynamic> body = {
       'email': userModel?.email,
       'first_name': userModel?.firstName,
@@ -269,13 +312,13 @@ class PaidMarketProvider {
         "number": userModel?.document,
       },
     };
-    Future<CustomerModel?> futureCustomerModel = this
+    Future<CustomerModel?> futureCustomerModel = httpService
         .postWithCredentials(path: path, body: body)
         .then((http.Response response) {
       if (response.statusCode == 200 || response.statusCode == 201) {
         final decodeData = json.decode(response.body);
         if (decodeData != null) {
-          CustomerModel customerModel = new CustomerModel.fromJson(decodeData);
+          CustomerModel customerModel = CustomerModel.fromJson(decodeData);
           return customerModel;
         }
       }
@@ -293,7 +336,7 @@ class PaidMarketProvider {
       'token': token,
     };
 
-    Future<Card?> futureCustomerModel = this
+    Future<Card?> futureCustomerModel = httpService
         .postWithCredentials(path: path, body: body)
         .then((http.Response response) {
       final decodeData = json.decode(response.body);
@@ -307,9 +350,7 @@ class PaidMarketProvider {
           decodeData != null &&
           decodeData['cause'] != null) {
         final msg = _readErrorCode(decodeData, 'leyendo la tarjeta');
-        final card = new Card(
-          error: msg,
-        );
+        final card = Card(error: msg);
         return card;
       }
       return null;
@@ -321,7 +362,7 @@ class PaidMarketProvider {
     required Card? dataCard,
     required email,
   }) {
-    final String path = "/card_tokens";
+    const String path = "/card_tokens";
     Map<String, dynamic> body = {};
     if (dataCard?.id != null) {
       body = {"cardId": dataCard?.id, "securityCode": dataCard?.cvv};
@@ -338,7 +379,7 @@ class PaidMarketProvider {
       };
     }
 
-    Future<Map?> futureCustomerModel = this
+    Future<Map?> futureCustomerModel = httpService
         .postWithCredentials(path: path, body: body)
         .then((http.Response response) async {
       final decodeData = json.decode(response.body);
@@ -380,41 +421,41 @@ class PaidMarketProvider {
   }
 
   Future<PaymentResponseModel?> payOrder({
-    required Card? dataCard,
-    required UserModel? userModel,
-    required String? orderNumber,
+    required Card dataCard,
+    required UserModel userModel,
+    required String orderNumber,
     required double amount,
   }) {
-    final String path = "/payments";
+    const String path = "/payments";
     Map<String, dynamic> body = {
       "transaction_amount": amount,
-      "token": dataCard?.token,
-      "notification_url": "https://binnicordova.com/retorno",
-      "installments": dataCard?.installments ?? 1,
-      "payment_method_id": dataCard?.paymentMethod?.id,
-      "description": "Compra en https://binnicordova.com Flutter",
+      "token": dataCard.id,
+      "notification_url": "https://website.com/retorno",
+      "installments": dataCard.installments ?? 1,
+      "payment_method_id": dataCard.paymentMethod?.id,
+      "description": "Compra en https://website.com Flutter",
       "payer": {
-        "id": dataCard?.customerId,
+        "id": dataCard.customerId,
         "identification": {
-          "number": userModel?.document,
-          "type": "DNI",
+          "number": userModel.document,
+          "type": userModel.idCountriesDocumentsTypes ?? 'DNI',
         }
       },
       "external_reference": orderNumber,
       "additional_info": {
         "payer": {
-          "first_name": userModel?.firstName,
-          "last_name": userModel?.lastName,
+          "first_name": userModel.firstName,
+          "last_name": userModel.lastName,
           "registration_date": "",
           "phone": {
-            "area_code": userModel?.idCountriesCodes,
-            "number": userModel?.phoneNumber
+            "area_code": userModel.idCountriesCodes,
+            "number": userModel.phoneNumber
           }
         },
       }
     };
 
-    Future<PaymentResponseModel?> futurePaymentResponseModel = this
+    Future<PaymentResponseModel?> futurePaymentResponseModel = httpService
         .postWithCredentials(path: path, body: body)
         .then((http.Response response) {
       final decodeData = json.decode(response.body);
@@ -436,7 +477,7 @@ class PaidMarketProvider {
     final String path =
         "/customers/${dataCard?.customerId}/cards/${dataCard?.id}";
 
-    final request = this
+    final request = httpService
         .deleteWithCredentials(path: path)
         .then((http.Response response) {});
     return request;
@@ -455,19 +496,21 @@ class PaidMarketProvider {
     } else {
       code = 'default';
     }
-    if (this.codes[code] != null) {
-      return this.codes[code];
+    if (codes[code] != null) {
+      return codes[code];
     } else {
       return "Ocurrio un error $action, por favor reintenta.";
     }
   }
 
   Future<List<dynamic>?> getIdentificationTypes({int idTaxonomies = 0}) async {
-    final path = '/identification_types';
+    const path = '/identification_types';
 
-    Future<List<dynamic>?> dataIdentificationTypes = getWithCredentials(
+    Future<List<dynamic>?> dataIdentificationTypes = httpService
+        .getWithCredentials(
       path: path,
-    ).then(
+    )
+        .then(
       (http.Response? response) {
         if (response?.statusCode == 200) {
           List<dynamic> decodeData = json.decode(response!.body);
@@ -479,131 +522,102 @@ class PaidMarketProvider {
 
     return dataIdentificationTypes;
   }
+}
 
-  Future<CustomerModel?> updatedDefaultCard({
-    required String idUser,
-    required String idCard,
+class SubscriptionProvider {
+  final String authorization;
+
+  late HttpService httpService;
+
+  SubscriptionProvider({
+    required this.authorization,
   }) {
-    final String path = "/customers/$idUser";
-
-    Map<String, dynamic> body = {
-      'default_card': idCard,
-    };
-    Future<CustomerModel?> futureCustomerModel = this
-        .putWithCredentials(path: path, body: body)
-        .then((http.Response response) {
-      if (response.statusCode == 200) {
-        final decodeData = json.decode(response.body);
-        dynamic data = decodeData;
-        if (data['cards'].length > 1) {
-          String defaultCard = data['default_card'];
-          for (var x = 0; x < data['cards'].length; x++) {
-            if (defaultCard == data['cards'][x]['id']) {
-              dynamic first = (data['cards'] as List).removeAt(x);
-              (data['cards'] as List).add(first);
-            }
-          }
-        }
-        CustomerModel customerModel = new CustomerModel.fromJson(
-          data,
-        );
-        return customerModel;
-      }
-      return null;
-    });
-    return futureCustomerModel;
+    httpService = HttpService(authorization: authorization, version: '');
   }
 
-  Future<CardTypeModel?> getInstallmentsCard({required String bins}) {
-    final Map<String, String> queryStringParams = {
-      'marketplace': 'NONE',
-      'status': 'active',
-      'js_version': '1.3.1',
-      'bins': bins,
-      'referer': 'https://binnicordova.com'
-    };
-    final String path = "/payment_methods/search";
-    final Future<CardTypeModel?> futureCardTypeModel = this
-        .getWithCredentials(path: path, queryStringParams: queryStringParams)
-        .then((http.Response? response) {
-      if (response?.statusCode == 200) {
-        final decodeData = json.decode(response!.body);
-        if (decodeData['results'] is List) {
-          CardTypeModel cardTypeModel =
-              new CardTypeModel.fromJson(decodeData['results'][0]);
-          return cardTypeModel;
-        }
-        return null;
-      }
-      return null;
-    });
-    return futureCardTypeModel;
-  }
-
-  Future<List<PayerCostModel?>?> getPayerCostCard({
-    required String paymentMethodid,
-    required int issuerId,
+  Future<String?> createPlan({
+    required reason,
+    int frequency = 1,
+    String frequencyType = 'months',
+    int repetitions = 5,
+    int day = 10,
     required double amount,
   }) {
-    final Map<String, String> queryStringParams = {
-      'js_version': '1.3.1',
-      'payment_method_id': paymentMethodid,
-      'issuer.id': '$issuerId',
-      'amount': '$amount',
-      'locale': 'es',
-      'referer': 'https://binnicordova.com'
-    };
-    final String path = "/payment_methods/installments";
-    final Future<List<PayerCostModel?>?> futurePayerCostModel = this
-        .getWithCredentials(path: path, queryStringParams: queryStringParams)
-        .then((http.Response? response) {
-      try {
-        if (response?.statusCode == 200 && amount > 1) {
-          final decodeData = json.decode(response!.body);
-          List<PayerCostModel> listPayerCostModel =
-              List<PayerCostModel>.empty(growable: true);
-          if (decodeData?[0]?['payer_costs'] != null)
-            for (var i = 0; i < decodeData[0]['payer_costs'].length; i++) {
-              listPayerCostModel.add(
-                  PayerCostModel.fromJson(decodeData[0]['payer_costs'][i]));
-            }
-          return listPayerCostModel;
-        }
-      } catch (e) {
-        print(e);
-      }
-      return null;
-    });
-    return futurePayerCostModel;
-  }
-
-  Future<Card?> tokenCardCreate(Card? cards) {
-    final String path = "/card_tokens";
+    const String path = "/preapproval_plan";
     Map<String, dynamic> body = {
-      "cardNumber": cards?.cardNumber,
-      // "email": email,
-      "cardholder": cards?.cardholder?.toJson(),
-      // "cardholder": {"name": "APRO"},
-      // "issuer": {"name": "APRO"},
-      "expirationYear": cards?.expirationYear,
-      "expirationMonth": cards?.expirationMonth,
-      "securityCode": cards?.cvv
+      'reason': reason,
+      'auto_recurring': {
+        'frequency': 1,
+        'frequency_type': 'months',
+        'repetitions': 5,
+        'billing_day': 10,
+        'billing_day_proportional': true,
+        'free_trial': {'frequency': 0, 'frequency_type': 'months'},
+        'transaction_amount': 10,
+        'currency_id': 'PEN'
+      },
+      'payment_methods_allowed': {
+        'payment_types': [{}],
+        'payment_methods': [{}]
+      },
+      'back_url': 'https://website.com'
     };
 
-    Future<Card?> futureCards = this
+    Future<String?> futurePlan = httpService
         .postWithCredentials(path: path, body: body)
         .then((http.Response response) {
       final decodeData = json.decode(response.body);
       if (response.statusCode == 200 || response.statusCode == 201) {
         if (decodeData != null && decodeData['id'] != null) {
-          final Card newCard = Card.fromJson(decodeData);
-          return newCard;
+          return decodeData['id'];
         }
         return null;
       }
       return null;
     });
 
-    return futureCards;
+    return futurePlan;
+  }
+
+  Future<String?> createSubscription({
+    required String reason,
+    required String planId,
+    required String externalReference,
+    required UserModel userModel,
+    required Card card,
+  }) {
+    const String path = "/preapproval";
+    Map<String, dynamic> body = {
+      'preapproval_plan_id': planId,
+      'reason': reason,
+      'external_reference': externalReference,
+      'payer_email': userModel.email,
+      'card_token_id': card.id,
+      'auto_recurring': {
+        'frequency': 1,
+        'frequency_type': 'months',
+        'start_date': '2020-06-02T13:07:14.260Z',
+        'end_date': '2022-07-20T15:59:52.581Z',
+        'transaction_amount': 10,
+        'currency_id': 'PEN'
+      },
+      'back_url': 'https://website.com',
+      'status': 'active'
+    };
+
+    Future<String?> futurePlan = httpService
+        .postWithCredentials(path: path, body: body)
+        .then((http.Response response) {
+      final decodeData = json.decode(response.body);
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        if (decodeData != null && decodeData['id'] != null) {
+          return decodeData['id'];
+        }
+        return null;
+      }
+      return null;
+    });
+
+    return futurePlan;
   }
 }
