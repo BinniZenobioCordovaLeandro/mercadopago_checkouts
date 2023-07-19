@@ -31,6 +31,10 @@ Please file any issues, bugs, or feature requests in this repository.
 
 - [*] pay order
 
+- [*] pay plan
+- [*] list plans
+- [*] subscribe to plan
+
 ## Getting started
 
 EASY AND SIMPLE!
