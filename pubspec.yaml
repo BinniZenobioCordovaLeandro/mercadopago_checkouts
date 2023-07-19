@@ -1,20 +1,20 @@
 name: mercadopago_by_binnicordova
 description: A complete package to pay orders using mercadopago platform, wrote by BinniCordova.
-version: 0.0.1
+version: 0.0.2
 homepage: https://binnicordova.com/
 
 environment:
-  sdk: '>=3.0.2 <4.0.0'
+  sdk: ">=2.12.0 <3.0.0"
   flutter: ">=1.17.0"
 
 dependencies:
   flutter:
     sdk: flutter
-  http: ^1.0.0
+  http: any
 
 dev_dependencies:
-  faker: ^2.1.0
-  flutter_lints: ^2.0.0
+  faker: any
+  flutter_lints: any
   flutter_test:
     sdk: flutter
 
