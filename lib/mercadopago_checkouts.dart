@@ -579,6 +579,18 @@ class SubscriptionProvider {
     return futurePlan;
   }
 
+  Future<List?> listPlans() {
+    const String path = "/preapproval/search";
+
+    Future<List?> futureListPlans = httpService
+        .getWithCredentials(path: path)
+        .then((http.Response? response) {
+      return List.generate(1, (index) => null);
+    });
+
+    return futureListPlans;
+  }
+
   Future<String?> createSubscription({
     required String reason,
     required String planId,

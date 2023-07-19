@@ -20,6 +20,15 @@ void main() {
     expect(planId, isNot(equals(null)));
   });
 
+  test('list plans', () async {
+    SubscriptionProvider subscriptions =
+        SubscriptionProvider(authorization: auth);
+
+    List? listPlans = await subscriptions.listPlans();
+
+    expect(listPlans, isNotEmpty);
+  });
+
   test('create suscription to plan', () async {
     SubscriptionProvider subscriptions =
         SubscriptionProvider(authorization: auth);
